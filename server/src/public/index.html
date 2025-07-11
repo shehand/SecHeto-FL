@@ -1,0 +1,349 @@
+<!--
+  Copyright (c) Shehan Edirimannage, 2025
+
+  This file is part of the SecHeto-FL project.
+
+  Licensed for evaluation and personal testing purposes only.
+  Redistribution, modification, or commercial use of this file,
+  in whole or in part, is strictly prohibited without explicit
+  written permission from the copyright holder.
+
+  For license inquiries, contact: [your contact email or website]
+-->
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Federated Learning Server Admin</title>
+    <style>
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background-color: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+        }
+        h1 {
+            color: #333;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 500;
+            color: #555;
+        }
+        input {
+            width: 100%;
+            padding: 8px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            font-size: 14px;
+            box-sizing: border-box;
+        }
+        input:focus {
+            outline: none;
+            border-color: #007bff;
+            box-shadow: 0 0 0 2px rgba(0, 123, 255, 0.25);
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 14px;
+            font-weight: 500;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .success {
+            color: #28a745;
+            background-color: #d4edda;
+            padding: 10px;
+            border-radius: 4px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        .status-panel {
+            margin-top: 30px;
+            padding: 15px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+        }
+        .status-item {
+            margin-bottom: 10px;
+            padding: 10px;
+            background-color: white;
+            border-radius: 4px;
+            border: 1px solid #dee2e6;
+        }
+        .client-list {
+            margin-top: 30px;
+        }
+        .client-item {
+            background-color: white;
+            padding: 15px;
+            border-radius: 4px;
+            margin-bottom: 10px;
+            border: 1px solid #dee2e6;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .client-info {
+            flex-grow: 1;
+        }
+        .client-status {
+            padding: 4px 8px;
+            border-radius: 4px;
+            font-size: 12px;
+            font-weight: 500;
+            margin-left: 10px;
+        }
+        .status-idle {
+            background-color: #e9ecef;
+            color: #495057;
+        }
+        .status-training {
+            background-color: #cff4fc;
+            color: #055160;
+        }
+        .status-aggregating {
+            background-color: #fff3cd;
+            color: #664d03;
+        }
+        .disconnect-btn {
+            background-color: #dc3545;
+            color: white;
+            border: none;
+            padding: 6px 12px;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 12px;
+            margin-left: 10px;
+        }
+        .disconnect-btn:hover {
+            background-color: #bb2d3b;
+        }
+        .no-clients {
+            text-align: center;
+            padding: 20px;
+            background-color: #f8f9fa;
+            border-radius: 4px;
+            color: #6c757d;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>Federated Learning Server Admin</h1>
+        
+        <div id="error" class="error"></div>
+        <div id="success" class="success"></div>
+
+        <form id="configForm">
+            <div class="form-group">
+                <label for="totalRounds">Total Federation Rounds:</label>
+                <input type="number" id="totalRounds" name="totalRounds" min="1" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="requiredClients">Required Clients:</label>
+                <input type="number" id="requiredClients" name="requiredClients" min="1" required>
+            </div>
+            
+            <div class="form-group">
+                <label for="aggregationInterval">Aggregation Interval (ms):</label>
+                <input type="number" id="aggregationInterval" name="aggregationInterval" min="100" step="100" required>
+            </div>
+            
+            <button type="submit">Update Configuration</button>
+        </form>
+
+        <div class="status-panel">
+            <h2>Server Status</h2>
+            <div class="status-item">
+                <strong>Connected Clients:</strong> <span id="connectedClients">0</span>
+            </div>
+            <div class="status-item">
+                <strong>Current Round:</strong> <span id="currentRound">0</span>
+            </div>
+            <div class="status-item">
+                <strong>Training Status:</strong> <span id="trainingStatus">Not Started</span>
+            </div>
+        </div>
+
+        <div class="client-list">
+            <h2>Connected Clients</h2>
+            <div id="clientList"></div>
+        </div>
+    </div>
+
+    <script>
+        // Fetch current configuration
+        async function fetchConfig() {
+            try {
+                const response = await fetch('/config');
+                const config = await response.json();
+                
+                document.getElementById('totalRounds').value = config.totalRounds;
+                document.getElementById('requiredClients').value = config.requiredClients;
+                document.getElementById('aggregationInterval').value = config.aggregationInterval;
+            } catch (error) {
+                showError('Failed to fetch current configuration');
+            }
+        }
+
+        // Update configuration
+        document.getElementById('configForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const config = {
+                totalRounds: parseInt(document.getElementById('totalRounds').value),
+                requiredClients: parseInt(document.getElementById('requiredClients').value),
+                aggregationInterval: parseInt(document.getElementById('aggregationInterval').value)
+            };
+
+            try {
+                const response = await fetch('/config', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify(config)
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to update configuration');
+                }
+
+                showSuccess('Configuration updated successfully');
+            } catch (error) {
+                showError(error.message);
+            }
+        });
+
+        // Update server status
+        async function updateStatus() {
+            try {
+                const response = await fetch('/progress');
+                const status = await response.json();
+                
+                document.getElementById('connectedClients').textContent = 
+                    `${status.clients.current}/${status.clients.required}`;
+                document.getElementById('currentRound').textContent = 
+                    `${status.rounds.current}/${status.rounds.total}`;
+                document.getElementById('trainingStatus').textContent = 
+                    status.currentRound ? status.currentRound.status : 'Not Started';
+            } catch (error) {
+                console.error('Failed to update status:', error);
+            }
+        }
+
+        function showError(message) {
+            const errorDiv = document.getElementById('error');
+            errorDiv.textContent = message;
+            errorDiv.style.display = 'block';
+            setTimeout(() => {
+                errorDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        function showSuccess(message) {
+            const successDiv = document.getElementById('success');
+            successDiv.textContent = message;
+            successDiv.style.display = 'block';
+            setTimeout(() => {
+                successDiv.style.display = 'none';
+            }, 5000);
+        }
+
+        // Update client list
+        async function updateClientList() {
+            try {
+                const response = await fetch('/clients');
+                const clients = await response.json();
+                
+                const clientListElement = document.getElementById('clientList');
+                if (clients.length === 0) {
+                    clientListElement.innerHTML = '<div class="no-clients">No clients connected</div>';
+                    return;
+                }
+
+                clientListElement.innerHTML = clients.map(client => `
+                    <div class="client-item">
+                        <div class="client-info">
+                            <strong>ID:</strong> ${client.id}
+                            <span class="client-status status-${client.status.toLowerCase()}">${client.status}</span>
+                            <br>
+                            <small>Connected: ${new Date(client.connectedAt).toLocaleString()}</small>
+                        </div>
+                        <button 
+                            class="disconnect-btn" 
+                            onclick="disconnectClient('${client.id}')"
+                        >
+                            Disconnect
+                        </button>
+                    </div>
+                `).join('');
+            } catch (error) {
+                console.error('Failed to update client list:', error);
+            }
+        }
+
+        // Disconnect client
+        async function disconnectClient(clientId) {
+            try {
+                const response = await fetch(`/clients/${clientId}`, {
+                    method: 'DELETE'
+                });
+
+                if (!response.ok) {
+                    const error = await response.json();
+                    throw new Error(error.error || 'Failed to disconnect client');
+                }
+
+                showSuccess(`Client ${clientId} disconnected successfully`);
+                updateClientList(); // Refresh the list
+            } catch (error) {
+                showError(error.message);
+            }
+        }
+
+        // Initial load
+        fetchConfig();
+        updateStatus();
+        updateClientList();
+
+        // Update status and client list periodically
+        setInterval(() => {
+            updateStatus();
+            updateClientList();
+        }, 2000);
+    </script>
+</body>
+</html> 
