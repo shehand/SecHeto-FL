@@ -187,7 +187,12 @@ npm start -- --min-clients=10 --fl-rounds=50  # Full experiment
 
 ## 📄 License
 
-Refer to LICENSE file.
+This software is released under an **Evaluation-Only License**.  
+Use is limited to personal, non-commercial evaluation. Academic and research use is explicitly prohibited.
+
+For licensing inquiries or special permissions, contact the developer.
+
+See LICENSE for full terms.
 
 ## 🙏 Acknowledgments
 
